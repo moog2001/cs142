@@ -17,35 +17,42 @@ class PhotoShare extends React.Component {
   static contextType = MyContext;
   constructor(props) {
     super(props);
+
+    this.state = {
+      user: null,
+      setUser: (userObj) => {
+        this.setState({ user: userObj });
+      },
+      fetched: false,
+      setFetch: (bool) => {
+        this.setState({ fetched: bool });
+      },
+    };
+
+    this.fetch();
   }
 
-  setUser = (userObj) => {
-    this.setState({ user: userObj });
-  };
-
-  state = {
-    user: null,
-    setUser: this.setUser,
+  fetch = () => {
+    axios
+      .get("/currentUser")
+      .then((res) => {
+        this.state.setUser(res.data);
+        this.setState({ fetched: true });
+      })
+      .catch((e) => {
+        console.log(e);
+        this.setState({ fetched: true });
+      });
   };
 
   redirect = () => {
-    if (this.state.user === null) {
-      return <Redirect to="/login" />;
+    if (!this.state.fetched) return;
+    if (this.state.user) {
+      return;
     }
+    console.log(this.state.user);
+    return <Redirect to="/login" />;
   };
-
-  componentDidMount() {
-    axios
-      .get("/currentUser")
-      .then((response) => {
-        this.setState({ user: response.data });
-      })
-      .catch((err) => {
-        console.error(err);
-      });
-  }
-
-  redirectToCurrentUser = () => {};
 
   render() {
     return (

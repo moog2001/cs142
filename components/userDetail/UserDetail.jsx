@@ -3,11 +3,14 @@ import { Link } from "react-router-dom";
 import { Typography, Grid, Button } from "@material-ui/core";
 import "./userDetail.css";
 const axios = require("axios");
+import { MyContext } from "../../context";
 
 /**
  * Define UserDetail, a React componment of CS142 project #5
  */
 class UserDetail extends React.Component {
+  static contextType = MyContext;
+
   constructor(props) {
     super(props);
     var _isMounted = false;
@@ -20,13 +23,15 @@ class UserDetail extends React.Component {
   fetch = () => {
     if (
       (this.props.match.params.userId && !this.state.data) ||
-      this.props.match.params.userId !== this.state.data._id
+      (this.props.match.params.userId !== this.state.data._id &&
+        this.context.fetched)
     ) {
       axios
         .get(`/user/${this.props.match.params.userId}`)
         .then((response) => {
           if (this._isMounted === true) {
             this.setState({ data: response.data });
+            this.context.setFetch(true);
           }
         })
         .catch((err) => {

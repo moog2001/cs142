@@ -1,24 +1,39 @@
 import React from "react";
-import { TextField, CssBaseline, Button } from "@material-ui/core";
+import { TextField, CssBaseline, Button, Box } from "@material-ui/core";
 import { useFormik } from "formik";
 import { MyContext } from "../../context";
-import { Redirect } from "react-router";
-import { useContext } from "react";
+import { Redirect, Switch, Route } from "react-router";
+import { useContext, useState } from "react";
+import Register from "../Register/Register";
+import axios from "axios";
 import "./LoginRegister.css";
 const LoginRegister = () => {
   const Context = useContext(MyContext);
+
+  const [loginMessage, setLoginMessage] = useState("");
+
   // Pass the useFormik() hook initial form values and a submit function that will
   // be called when the form is submitted
   const formik = useFormik({
     initialValues: {
       username: "",
-      password: "",
+      login_password: "",
     },
     onSubmit: (values) => {
-      console.log(JSON.stringify(values, null, 2));
+      axios
+        .post("/admin/login", {
+          login_name: values.login_name,
+          password: values.login_password,
+        })
+        .then((res) => {
+          Context.setUser(res.data);
+        })
+        .catch((e) => {
+          setLoginMessage("Username or Password is incorrect");
+          console.error(e);
+        });
     },
   });
-
   const redirect = () => {
     if (Context.user) {
       return <Redirect to={`/users/${Context.user._id}`} />;
@@ -26,45 +41,41 @@ const LoginRegister = () => {
   };
 
   return (
-    <CssBaseline>
+    <div className="outer">
       {redirect()}
-      <div className="mainContainer">
-        <form action="/admin/login" method="POST" encType="multipart/form-data">
-          <TextField
-            margin="normal"
-            required
-            fullWidth
-            id="login_name"
-            label="Username"
-            name="login_name"
-            autoComplete="name"
-            value={formik.values.email}
-            onChange={formik.handleChange}
-            autoFocus
-          />
-          <TextField
-            margin="normal"
-            required
-            fullWidth
-            name="password"
-            label="Password"
-            type="password"
-            onChange={formik.handleChange}
-            value={formik.values.password}
-            id="password"
-            autoComplete="current-password"
-          />
-          <Button
-            type="submit"
-            fullWidth
-            variant="contained"
-            sx={{ mt: 3, mb: 2 }}
-          >
+
+      <form className="mainContainer" onSubmit={formik.handleSubmit}>
+        <TextField
+          margin="normal"
+          required
+          id="login_name"
+          label="Username"
+          name="login_name"
+          autoComplete="name"
+          value={formik.values.email}
+          onChange={formik.handleChange}
+          autoFocus
+        />
+        <TextField
+          margin="normal"
+          required
+          name="login_password"
+          label="Password"
+          type="password"
+          onChange={formik.handleChange}
+          value={formik.values.password}
+          id="login_password"
+          autoComplete="current-password"
+        />
+        <Box m="1rem">
+          <Button type="submit" variant="contained" style={{ width: 200 }}>
             Sign In
           </Button>
-        </form>
-      </div>
-    </CssBaseline>
+        </Box>
+        <div>{loginMessage}</div>
+      </form>
+      <Register />
+    </div>
   );
 };
 

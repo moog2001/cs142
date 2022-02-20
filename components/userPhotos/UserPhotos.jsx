@@ -18,12 +18,14 @@ class UserPhotos extends React.Component {
     };
   }
 
-  componentDidMount() {
-    this._isMounted = true;
+  fetch() {
     axios
       .get(`/photosOfUser/${this.props.match.params.userId}`)
       .then((response) => {
-        if (this._isMounted) {
+        if (
+          this._isMounted &&
+          JSON.stringify(this.state.data) !== JSON.stringify(response.data)
+        ) {
           this.setState({
             data: response.data,
             userId: this.props.match.params.userId,
@@ -33,6 +35,15 @@ class UserPhotos extends React.Component {
       .catch((err) => {
         console.error(err);
       });
+  }
+
+  componentDidUpdate() {
+    this.fetch();
+  }
+
+  componentDidMount() {
+    this._isMounted = true;
+    this.fetch();
   }
 
   giveImages = (element) => {
@@ -74,19 +85,33 @@ class UserPhotos extends React.Component {
     const photos = Object.values(photosObj);
 
     return (
-      <Grid container columns={{ xs: 4, sm: 8, md: 12 }}>
+      <Grid container columns={{ sm: 2, md: 3 }}>
         {photos.map((element, index) => (
-          <Grid item xs={2} sm={4} md={4} key={index}>
+          <Grid
+            style={{ maxHeight: 400, maxWidth: 300, overflow: "auto" }}
+            item
+            sm={12}
+            md={4}
+            key={index}
+          >
             <img src={`images/${element.file_name}`} height="128"></img>
             <p>{element.date_time}</p>
             {this.giveImages(element)}
-            <Formik initialValues={{ comment: "" }}>
+            <Formik
+              initialValues={{ comment: "" }}
+              onSubmit={(values, actions) => {
+                axios
+                  .post(`/commentsOfPhoto/${element._id}`, {
+                    comment: values.comment,
+                  })
+                  .then((res) => {
+                    actions.setSubmitting(false);
+                    this.fetch();
+                  });
+              }}
+            >
               {(props) => (
-                <form
-                  action={`/commentsOfPhoto/${element._id}`}
-                  method="post"
-                  encType="multipart/form-data"
-                >
+                <form onSubmit={props.handleSubmit}>
                   <TextField
                     variant="outlined"
                     required

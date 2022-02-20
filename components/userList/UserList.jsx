@@ -23,18 +23,31 @@ class UserList extends React.Component {
     this.state = {
       data: null,
       user: "",
+      fetched: false,
     };
   }
 
-  componentDidMount() {
+  fetch = () => {
     axios
       .get("/user/list")
       .then((response) => {
-        this.setState({ data: response.data });
+        if (!this.state.fetched) {
+          this.setState({
+            data: response.data,
+            fetched: true,
+          });
+        }
       })
       .catch((err) => {
         console.error(err);
       });
+  };
+
+  componentDidMount() {
+    this.fetch();
+  }
+  componentDidUpdate() {
+    this.fetch();
   }
 
   giveList() {

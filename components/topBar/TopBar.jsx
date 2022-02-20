@@ -2,6 +2,7 @@ import React from "react";
 import { AppBar, Toolbar, Typography, Button } from "@material-ui/core";
 import "./TopBar.css";
 import { MyContext } from "../../context";
+import UploadFile from "../uploadFile/uploadFile";
 const axios = require("axios");
 
 /**
@@ -46,6 +47,7 @@ class TopBar extends React.Component {
             <Typography variant="h5" color="inherit">
               Hello {this.context.user.login_name}
             </Typography>
+            <UploadFile />
             <Button variant="contained" onClick={this.logOut}>
               Sign Out
             </Button>

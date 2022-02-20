@@ -51,6 +51,12 @@ var SchemaInfo = require("./schema/schemaInfo.js");
 console.log(Photo);
 
 var express = require("express");
+const { request } = require("express");
+
+const {
+  makePasswordEntry,
+  doesPasswordMatch,
+} = require("./node_modules/cs142password.js");
 
 const clientMongo = mongoose
   .connect("mongodb://localhost/cs142project6", {
@@ -60,9 +66,10 @@ const clientMongo = mongoose
   .then((m) => m.connection.getClient());
 
 var app = express();
+
 const upload = multer();
 app.use(express.static(__dirname));
-app.use(express.json());
+app.use(bodyParser.json());
 
 const sessionStore = MongoStore.create({ clientPromise: clientMongo });
 
@@ -237,67 +244,82 @@ app.get("/photosOfUser/:id", checkAuth, function (request, response) {
   // console.log(photos);
 
   // response.status(200).send(photos);
-  Photo.find({ user_id: id }, function (err, info) {
-    if (err) {
-      response.status(400).send(err);
-      return;
-    }
-    if (info.length === null) {
-      response.status(400).send("Photo id user_id: " + id + "not found!");
-      return;
-    }
-    var test = JSON.parse(JSON.stringify(info));
-
-    async.each(
-      test,
-      function (element, callback) {
-        delete element.__v;
-        async.each(
-          element.comments,
-          function (comment, callback1) {
-            User.findById(comment.user_id, function (err, info) {
-              if (err) {
-                console.err("error has occured: " + err);
-                callback1(err);
-                return;
-              }
-              info = JSON.parse(JSON.stringify(info));
-              delete comment.user_id;
-              delete info.__v;
-              delete info.location;
-              delete info.description;
-              delete info.occupation;
-              comment.user = info;
-              callback1();
-            });
-          },
-          function (err) {
-            callback(err);
-          }
-        );
-      },
-      function (err) {
-        if (err) {
-          response.status(400).send(err);
-        }
-        response.status(200).send(test);
+  Photo.find({ user_id: id })
+    .lean()
+    .exec(function (err, info) {
+      if (err) {
+        response.status(400).send(err);
+        return;
       }
-    );
-  });
+      if (info.length === null) {
+        response.status(400).send("Photo id user_id: " + id + "not found!");
+        return;
+      }
+
+      async.each(
+        info,
+        function (element, callback) {
+          delete element.__v;
+          async.each(
+            element.comments,
+            function (comment, callback1) {
+              User.findById(comment.user_id)
+                .lean()
+                .exec(function (err, info) {
+                  if (err) {
+                    console.err("error has occured: " + err);
+                    callback1(err);
+                    return;
+                  }
+                  delete comment.user_id;
+                  delete info.__v;
+                  delete info.location;
+                  delete info.description;
+                  delete info.occupation;
+                  comment.user = info;
+                  callback1();
+                });
+            },
+            function (err) {
+              callback(err);
+            }
+          );
+        },
+        function (err) {
+          if (err) {
+            response.status(400).send(err);
+          }
+          response.status(200).send(info);
+        }
+      );
+    });
 });
 
-app.post("/admin/login", upload.none(), function (req, res) {
-  console.log(req.body);
+app.post("/admin/login", function (req, res) {
   User.find({ login_name: req.body.login_name }, (err, info) => {
     if (err) {
-      return res.status(401).send(err);
+      console.log(err);
+      return res.status(400).send(err);
     }
     if (info.length === 0) {
-      return res.status(401).send("awdawdwa");
+      console.log("user not found /login");
+      return res.status(400).send("User not found");
     }
-    req.session.user = info[0];
-    res.redirect(`/photo-share.html#/users/${info[0]._id}`);
-    return res.status(200).send();
+
+    if (
+      doesPasswordMatch(
+        info[0].password_digest,
+        info[0].salt,
+        req.body.password
+      )
+    ) {
+      req.session.user = info[0];
+      // res.redirect(`/photo-share.html#/users/${info[0]._id}`);
+
+      return res.status(200).send(req.session.user);
+    }
+
+    return res.status(400).send("pass not correct");
   });
 });
 
@@ -309,47 +331,129 @@ app.post("/admin/logout", function (req, res) {
   res.status(200).send();
 });
 
-app.post("/commentsOfPhoto/:photo_id", upload.none(), (req, res) => {
+app.post("/commentsOfPhoto/:photo_id", checkAuth, (req, res) => {
   var photo_id = req.params.photo_id;
   if (!req.body.comment) {
-    return res.status(400).send();
+    return res.status(400).send("no comment");
   }
   if (req.body.comment.length === 0) {
     return res.status(400).send("Comment empty");
   }
 
-  // var commentSchema = new mongoose.Schema({
-  //   comment: String, // The text of the comment.
-  //   date_time: { type: Date, default: Date.now }, // The date and time when the comment was created.
-  //   user_id: mongoose.Schema.Types.ObjectId, // 	The ID of the user who created the comment.
-  // });
-
   Photo.findById(photo_id, (err, info) => {
     if (err) {
-      return res.status(500).send(err);
+      return res.status(500).send("photo not found");
     }
     if (info.length === 0) {
       return res.status(400).send("Empty");
     }
-    console.log(commentSchema);
 
-    console.log(info);
+    const comment = new Comment({
+      comment: req.body.comment,
+      user_id: req.session.user._id, // 	The ID of the user who created the comment.
+    });
+    info.comments.push(comment);
+    info.save();
+    return res.status(200).send("Success!");
   });
-  console.log(req.body.comment, photo_id);
 });
 
 app.get("/currentUser", checkAuth, (req, res) => {
   res.status(200).send(req.session.user);
 });
 
-app.get("/123", (req, res) => {
-  if (req.session.count) {
-    req.session.count++;
-  } else {
-    req.session.count = 1;
-  }
-  res.status(200).send(`<h1>Hello. count  = ${req.session.count}</h1>`);
+const processFormBody = multer({ storage: multer.memoryStorage() }).single(
+  "uploadedphoto"
+);
+
+const fs = require("fs");
+
+app.post("/photos/new", checkAuth, (request, response) => {
+  processFormBody(request, response, function (err) {
+    if (err || !request.file) {
+      // XXX -  Insert error handling code here.
+      return response.status(400).send("no file: ", err);
+    }
+    // request.file has the following properties of interest
+    //      fieldname      - Should be 'uploadedphoto' since that is what we sent
+    //      originalname:  - The name of the file the user uploaded
+    //      mimetype:      - The mimetype of the image (e.g. 'image/jpeg',  'image/png')
+    //      buffer:        - A node Buffer containing the contents of the file
+    //      size:          - The size of the file in bytes
+
+    // XXX - Do some validation here.
+    // We need to create the file in the directory "images" under an unique name. We make
+    // the original file name unique by adding a unique prefix with a timestamp.
+    const timestamp = new Date().valueOf();
+    const filename = "U" + String(timestamp) + request.file.originalname;
+
+    fs.writeFile("./images/" + filename, request.file.buffer, function (err) {
+      // XXX - Once you have the file written into your images directory under the name
+      // filename you can create the Photo object in the database
+      if (err) {
+        return response.status(400).send(err);
+      }
+      //  var photoSchema = new mongoose.Schema({
+      //    file_name: String, // 	Name of a file containing the actual photo (in the directory project6/images).
+      //    date_time: { type: Date, default: Date.now }, // 	The date and time when the photo was added to the database
+      //    user_id: mongoose.Schema.Types.ObjectId, // The ID of the user who created the photo.
+      //    comments: [commentSchema], // Array of comment objects representing the comments made on this photo.
+      //  });
+
+      var newPhoto = new Photo({
+        file_name: filename,
+        user_id: request.session.user._id,
+      });
+
+      newPhoto.save();
+
+      return response.status(200).send();
+    });
+  });
 });
+
+app.post("/user", (req, res) => {
+  var arr = Object.keys(req.body);
+  if (arr.length !== 6) {
+    return res.status(400).send("Invalid Input");
+  }
+  arr.forEach((e) => {
+    if (e.length == 0) {
+      return res.status(400).send(e, " is Invalid Input");
+    }
+  });
+
+  User.find({ login_name: req.body.last_name.toLowerCase() }, (err, info) => {
+    if (err) {
+      console.log(err);
+      return res.status(505).send(err);
+    }
+    if (info.length > 0) {
+      return res.status(400).send("login_name not available");
+    }
+
+    var password = makePasswordEntry(req.body.password);
+
+    var newUser = new User({
+      login_name: req.body.last_name.toLowerCase(),
+      first_name: req.body.first_name, // First name of the user.
+      last_name: req.body.last_name, // Last name of the user.
+      location: req.body.location, // Location  of the user.
+      description: req.body.description, // A brief user description
+      occupation: req.body.occupation, // Occupation of the user.
+      password_digest: password.hash,
+      salt: password.salt,
+    });
+
+    newUser.save();
+
+    console.log("registered user: ", newUser);
+
+    res.status(200).send();
+  });
+});
+
+app.get("/123", (req, res) => {});
 
 app.get("/currentUser", checkAuth, (req, res) => {
   res.status(200).send(req.session.user);
