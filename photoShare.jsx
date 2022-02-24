@@ -27,6 +27,10 @@ class PhotoShare extends React.Component {
       setFetch: (bool) => {
         this.setState({ fetched: bool });
       },
+      userList: null,
+      setUserList: (list) => {
+        this.setState({ userList: list });
+      },
     };
 
     this.fetch();

@@ -36,6 +36,17 @@ class UserList extends React.Component {
             data: response.data,
             fetched: true,
           });
+
+          var userNames = [];
+
+          response.data.forEach((e) => {
+            var temp = {
+              display: e.last_name,
+              id: e._id,
+            };
+            userNames.push(temp);
+          });
+          this.context.setUserList(userNames);
         }
       })
       .catch((err) => {

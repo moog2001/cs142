@@ -53,10 +53,7 @@ console.log(Photo);
 var express = require("express");
 const { request } = require("express");
 
-const {
-  makePasswordEntry,
-  doesPasswordMatch,
-} = require("./node_modules/cs142password.js");
+const { makePasswordEntry, doesPasswordMatch } = require("./cs142password.js");
 
 const clientMongo = mongoose
   .connect("mongodb://localhost/cs142project6", {
@@ -213,20 +210,56 @@ app.get("/user/:id", checkAuth, function (request, response) {
   var id = request.params.id;
   // console.log(request.params.id);
 
-  User.findById(id, function (err, info) {
+  User.find({ _id: id }).exec((err, info) => {
     if (err) {
+      return;
       response.status(400).send(err);
-      return;
     }
-    if (info === null) {
-      response.status(400).send("User with _id:" + id + " not found!");
-      return;
+    if (info === 0) {
+      return response.status(400).send("User with _id:" + id + " not found!");
     }
-    var test = JSON.parse(JSON.stringify(info));
+    var test = {};
 
-    delete test.__v;
+    test.user = JSON.parse(JSON.stringify(info[0]));
 
-    response.status(200).send(test);
+    delete test.user.__v;
+
+    Photo.find({
+      comments: {
+        $exists: true,
+        $not: { $size: 0 },
+        $elemMatch: {
+          mentions: { $exists: true, $not: { $size: 0 }, $in: id },
+        },
+      },
+    })
+      .lean()
+      .exec((err, info1) => {
+        if (err) {
+          return response.status(200).send(test);
+        }
+        if (info.length === 0) {
+          return response.status(200).send(test);
+        }
+
+        info1.forEach((elementPhotos) => {
+          var mentionComments = [];
+          elementPhotos.comments.forEach((elementComments) => {
+            if (elementComments.mentions.includes(id)) {
+              mentionComments.push(elementComments);
+            }
+            elementPhotos.comments = mentionComments;
+          });
+        });
+        // info1.forEach((element) => {
+        //   if (element.mentions.includes(id)) {
+        //   }
+        // });
+
+        test.photos = info1;
+
+        return response.status(200).send(test);
+      });
   });
 });
 
@@ -251,7 +284,7 @@ app.get("/photosOfUser/:id", checkAuth, function (request, response) {
         response.status(400).send(err);
         return;
       }
-      if (info.length === null) {
+      if (info.length === 0) {
         response.status(400).send("Photo id user_id: " + id + "not found!");
         return;
       }
@@ -351,7 +384,10 @@ app.post("/commentsOfPhoto/:photo_id", checkAuth, (req, res) => {
     const comment = new Comment({
       comment: req.body.comment,
       user_id: req.session.user._id, // 	The ID of the user who created the comment.
+      mentions: req.body.mentions,
     });
+
+    console.log(comment);
     info.comments.push(comment);
     info.save();
     return res.status(200).send("Success!");
@@ -367,6 +403,7 @@ const processFormBody = multer({ storage: multer.memoryStorage() }).single(
 );
 
 const fs = require("fs");
+const { exec } = require("child_process");
 
 app.post("/photos/new", checkAuth, (request, response) => {
   processFormBody(request, response, function (err) {
