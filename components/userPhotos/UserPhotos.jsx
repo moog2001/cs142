@@ -20,6 +20,9 @@ class UserPhotos extends React.Component {
     this.state = {
       data: null,
       userId: null,
+      setFetchRequired: () => {
+        this.request();
+      },
     };
   }
 
@@ -40,7 +43,10 @@ class UserPhotos extends React.Component {
     axios
       .get(`/photosOfUser/${this.props.match.params.userId}`)
       .then((response) => {
-        if (this._isMounted) {
+        if (
+          this._isMounted &&
+          JSON.stringify(response.data) !== JSON.stringify(this.state.data)
+        ) {
           this.setState({
             data: response.data,
             userId: this.props.match.params.userId,
@@ -64,7 +70,6 @@ class UserPhotos extends React.Component {
 
   componentDidMount() {
     this._isMounted = true;
-
     this.fetch();
   }
 
@@ -115,7 +120,11 @@ class UserPhotos extends React.Component {
             <img src={`images/${element.file_name}`} height="128"></img>
             <p>{element.date_time}</p>
             {this.giveImages(element)}
-            <MentionArea data={this.context.userList} _id={element._id} />
+            <MentionArea
+              fetch={this.state.setFetchRequired}
+              data={this.context.userList}
+              _id={element._id}
+            />
           </Grid>
         ))}
       </Grid>

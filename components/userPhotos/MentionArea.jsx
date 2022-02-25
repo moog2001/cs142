@@ -12,9 +12,7 @@ const MentionArea = (props) => {
   var handleChange = (e) => {
     setValue(e.target.value);
   };
-  var test = (id, display, startPos, endPos) => {
-    console.log(id, display, startPos, endPos);
-  };
+
   var handleSubmit = (e) => {
     if (!value) {
       return;
@@ -36,6 +34,9 @@ const MentionArea = (props) => {
       .then((res) => {
         setValue("");
       });
+
+    console.log(props.fetch);
+    props.fetch();
   };
 
   return (
@@ -47,7 +48,7 @@ const MentionArea = (props) => {
         placeholder={"Mention people using '@'"}
         a11ySuggestionsListLabel={"Suggested mentions"}
       >
-        <Mention onAdd={test} data={props.data} style={defaultMentionStyle} />
+        <Mention data={props.data} style={defaultMentionStyle} />
       </MentionsInput>
       <Button type="submit">Enter</Button>
     </form>
