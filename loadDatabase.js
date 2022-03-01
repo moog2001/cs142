@@ -32,7 +32,9 @@ mongoose.connect("mongodb://localhost/cs142project6", {
 });
 
 // Load the Mongoose schema for Use and Photo
-var User = require("./schema/user.js");
+var User = require("./schema/user.js").User;
+var Record = require("./schema/user.js").Record;
+var Comment = require("./schema/photo.js").Comment;
 var Photo = require("./schema/photo.js").Photo;
 var SchemaInfo = require("./schema/schemaInfo.js");
 
@@ -43,6 +45,7 @@ var removePromises = [
   User.deleteMany({}),
   Photo.deleteMany({}),
   SchemaInfo.deleteMany({}),
+  Record.deleteMany({}),
 ];
 
 Promise.all(removePromises)

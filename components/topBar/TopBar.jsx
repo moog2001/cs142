@@ -1,5 +1,6 @@
 import React from "react";
 import { AppBar, Toolbar, Typography, Button } from "@material-ui/core";
+import { Link } from "react-router-dom";
 import "./TopBar.css";
 import { MyContext } from "../../context";
 import UploadFile from "../uploadFile/uploadFile";
@@ -48,6 +49,9 @@ class TopBar extends React.Component {
               Hello {this.context.user.login_name}
             </Typography>
             <UploadFile />
+            <Button to="/activity" component={Link} variant="contained">
+              Activity
+            </Button>
             <Button variant="contained" onClick={this.logOut}>
               Sign Out
             </Button>

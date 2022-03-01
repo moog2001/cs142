@@ -9,6 +9,7 @@ import TopBar from "./components/topBar/TopBar";
 import UserDetail from "./components/userDetail/UserDetail";
 import UserList from "./components/userList/UserList";
 import UserPhotos from "./components/userPhotos/UserPhotos";
+import Activities from "./components/Activities/Activities";
 import LoginRegister from "./components/LoginRegister/LoginRegister";
 import { MyContext } from "./context";
 import axios from "axios";
@@ -73,10 +74,7 @@ class PhotoShare extends React.Component {
             <div className="cs142-main-topbar-buffer" />
             <Grid item sm={3}>
               <Paper className="cs142-main-grid-item">
-                <Route
-                  path="/users/:userId"
-                  children={(props) => <UserList {...props} />}
-                />
+                <Route path="/" children={(props) => <UserList {...props} />} />
               </Paper>
             </Grid>
             <Grid item sm={9}>
@@ -93,6 +91,10 @@ class PhotoShare extends React.Component {
                   <Route
                     path="/login"
                     render={(props) => <LoginRegister {...props} />}
+                  />
+                  <Route
+                    path="/activity"
+                    render={(props) => <Activities {...props} />}
                   />
                 </Switch>
               </Paper>

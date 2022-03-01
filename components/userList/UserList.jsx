@@ -16,7 +16,7 @@ const axios = require("axios");
  */
 class UserList extends React.Component {
   static contextType = MyContext;
-
+  static fetching = false;
   constructor(props) {
     super(props);
 
@@ -28,29 +28,34 @@ class UserList extends React.Component {
   }
 
   fetch = () => {
+    if (this.fetching) {
+      return;
+    }
+
+    this.fetching = true;
     axios
       .get("/user/list")
       .then((response) => {
-        if (!this.state.fetched) {
-          this.setState({
-            data: response.data,
-            fetched: true,
-          });
+        this.setState({
+          data: response.data,
+        });
 
-          var userNames = [];
+        this.fetching = false;
 
-          response.data.forEach((e) => {
-            var temp = {
-              display: e.last_name,
-              id: e._id,
-            };
-            userNames.push(temp);
-          });
-          this.context.setUserList(userNames);
-        }
+        var userNames = [];
+
+        response.data.forEach((e) => {
+          var temp = {
+            display: e.last_name,
+            id: e._id,
+          };
+          userNames.push(temp);
+        });
+        this.context.setUserList(userNames);
       })
       .catch((err) => {
         console.error(err);
+        this.fetching = false;
       });
   };
 
@@ -58,14 +63,13 @@ class UserList extends React.Component {
     this.fetch();
   }
   componentDidUpdate() {
-    this.fetch();
+    if (!this.state.data) {
+      console.log("fetchin");
+      this.fetch();
+    }
   }
 
-  giveList() {
-    if (this.state.data === null) {
-      return;
-    }
-
+  giveList = () => {
     return (
       <List component="nav">
         {this.state.data.map((element, index) => {
@@ -82,13 +86,13 @@ class UserList extends React.Component {
         })}
       </List>
     );
-  }
+  };
 
   render() {
     return (
       <div>
         <Typography variant="body1">User:</Typography>
-        {this.giveList()}
+        {this.state.data ? this.giveList() : null}
       </div>
     );
   }

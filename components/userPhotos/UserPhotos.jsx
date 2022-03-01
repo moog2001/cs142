@@ -64,9 +64,7 @@ class UserPhotos extends React.Component {
         }
       });
   };
-  componentDidUpdate() {
-    this.fetch();
-  }
+  componentDidUpdate() {}
 
   componentDidMount() {
     this._isMounted = true;

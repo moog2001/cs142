@@ -43,7 +43,9 @@ require("dotenv").config();
 var async = require("async");
 
 // Load the Mongoose schema for User, Photo, and SchemaInfo
-var User = require("./schema/user.js");
+var User = require("./schema/user.js").User;
+var Record = require("./schema/user.js").Record;
+
 var Photo = require("./schema/photo.js").Photo;
 var Comment = require("./schema/photo.js").Comment;
 var SchemaInfo = require("./schema/schemaInfo.js");
@@ -177,29 +179,34 @@ app.get("/test/:p1", function (request, response) {
  * URL /user/list - Return all the User object.
  */
 app.get("/user/list", checkAuth, function (request, response) {
-  User.find(function (err, info) {
-    if (err) {
-      response.status(400).send(JSON.stringify(err));
-      return;
-    }
-    if (info.length === 0) {
-      response.status(400).send("No users found");
-      return;
-    }
+  User.find({})
+    .populate("records")
+    .exec((err, info) => {
+      if (err) {
+        console.error(err);
+        response.status(400).send(err);
+        return;
+      }
+      if (info.length === 0) {
+        console.error("No users found");
+        response.status(400).send("No users found");
+        return;
+      }
 
-    var test = JSON.parse(JSON.stringify(info));
-    // console.log('user info ', test);
-    test.forEach((element) => {
-      delete element.location;
-      delete element.occupation;
-      delete element.__v;
-      delete element.description;
+      // console.log('user info ', test);
+      info.forEach((element) => {
+        delete element.location;
+        delete element.occupation;
+        delete element.__v;
+        delete element.description;
+      });
+
+      // console.log(info);
+      // console.log("user Id: " + request.session.userId);
+      // console.log(test);
+      response.status(200).send(info);
+      return;
     });
-    // console.log("user Id: " + request.session.userId);
-    // console.log(test);
-    response.status(200).send(test);
-    return;
-  });
   // response.status(200).send(cs142models.userListModel());
 });
 
@@ -281,10 +288,14 @@ app.get("/photosOfUser/:id", checkAuth, function (request, response) {
     .lean()
     .exec(function (err, info) {
       if (err) {
+        console.error(err);
+
         response.status(400).send(err);
         return;
       }
       if (info.length === 0) {
+        console.error("Photo id user_id: " + id + "not found!");
+
         response.status(400).send("Photo id user_id: " + id + "not found!");
         return;
       }
@@ -320,6 +331,7 @@ app.get("/photosOfUser/:id", checkAuth, function (request, response) {
         },
         function (err) {
           if (err) {
+            console.error(err);
             response.status(400).send(err);
           }
           response.status(200).send(info);
@@ -349,6 +361,12 @@ app.post("/admin/login", function (req, res) {
       req.session.user = info[0];
       // res.redirect(`/photo-share.html#/users/${info[0]._id}`);
 
+      var record = new Record({
+        user_id: req.session.user._id,
+        type: "Login",
+      });
+      record.save();
+
       return res.status(200).send(req.session.user);
     }
 
@@ -357,9 +375,16 @@ app.post("/admin/login", function (req, res) {
 });
 
 app.post("/admin/logout", function (req, res) {
-  if (!req.session.user) {
-    return res.status(400).send();
-  }
+  // if (!req.session.user) {
+  //   return res.status(400).send();
+  // }
+
+  var record = new Record({
+    user_id: req.session.user._id,
+    type: "Logout",
+  });
+  record.save();
+
   req.session.destroy();
   res.status(200).send();
 });
@@ -390,6 +415,15 @@ app.post("/commentsOfPhoto/:photo_id", checkAuth, (req, res) => {
     console.log(comment);
     info.comments.push(comment);
     info.save();
+
+    var record = new Record({
+      user_id: req.session.user._id,
+      object_id: comment._id,
+      parent_object_id: info._id,
+      type: "Comment",
+    });
+    record.save();
+
     return res.status(200).send("Success!");
   });
 });
@@ -444,6 +478,12 @@ app.post("/photos/new", checkAuth, (request, response) => {
 
       newPhoto.save();
 
+      var record = new Record({
+        user_id: request.session.user._id,
+        object_id: newPhoto._id,
+        type: "Photo",
+      });
+      record.save();
       return response.status(200).send();
     });
   });
@@ -484,6 +524,13 @@ app.post("/user", (req, res) => {
 
     newUser.save();
 
+    var record = new Record({
+      user_id: newUser._id,
+      object_id: newUser._id,
+      type: "Register",
+    });
+    record.save();
+
     console.log("registered user: ", newUser);
 
     res.status(200).send();
@@ -505,3 +552,140 @@ var server = app.listen(3000, function () {
       __dirname
   );
 });
+
+app.get("/activity", checkAuth, (req, res) => {
+  Record.find({})
+    .lean()
+    .exec((err, info) => {
+      if (err) {
+        res.status(505).send(err);
+      }
+
+      info.slice(0, 5);
+
+      var response = [];
+
+      async.each(
+        info,
+        (element, callback) => {
+          switch (element.type) {
+            case "Photo": {
+              Photo.findById(element.object_id)
+                .lean()
+                .exec((err, info) => {
+                  if (err) {
+                    console.error(err);
+                    return;
+                  }
+
+                  var sendObject = {};
+                  delete info.comments;
+                  sendObject.photo = info;
+                  sendObject.type = "Photo";
+                  response.push(sendObject);
+                  callback();
+                });
+              break;
+            }
+            case "Comment": {
+              var sendObject = {};
+
+              Photo.findById(element.parent_object_id)
+                .lean()
+                .exec((err, info) => {
+                  if (err) {
+                    console.error(err);
+                    return;
+                  }
+
+                  sendObject.comment = info.comments.find((elementSub) => {
+                    if (elementSub._id === element._id) {
+                      return true;
+                    }
+                  });
+
+                  delete info.comments;
+                  sendObject.type = "Comment";
+                  sendObject.photo = info;
+                  sendObject.date_time = element.date_time;
+                  response.push(sendObject);
+                  callback();
+                });
+              break;
+            }
+            case "Register": {
+              User.findById(element.user_id)
+                .lean()
+                .exec((err, info) => {
+                  if (err) {
+                    console.error(err);
+                    return;
+                  }
+                  var sendObject = {};
+                  sendObject.type = "Register";
+                  sendObject.login_name = info.login_name;
+                  sendObject.date_time = element.date_time;
+                  response.push(sendObject);
+                  callback();
+                });
+              break;
+            }
+            case "Login": {
+              User.findById(element.user_id)
+                .lean()
+                .exec((err, info) => {
+                  if (err) {
+                    console.error(err);
+                    return;
+                  }
+                  var sendObject = {};
+                  sendObject.type = "Login";
+                  sendObject.login_name = info.login_name;
+                  sendObject.date_time = element.date_time;
+                  response.push(sendObject);
+                  callback();
+                });
+              break;
+            }
+            case "Logout": {
+              console.log(element);
+
+              User.findById(element.user_id)
+                .lean()
+                .exec((err, info) => {
+                  if (err) {
+                    console.error(err);
+                    return;
+                  }
+                  var sendObject = {};
+                  sendObject.type = "Logout";
+                  console.log(info);
+                  sendObject.login_name = info.login_name;
+                  sendObject.date_time = element.date_time;
+                  response.push(sendObject);
+                  callback();
+                });
+              break;
+            }
+            default: {
+              callback(element.type);
+            }
+          }
+        },
+        function (err) {
+          if (err) {
+            console.error(err);
+          }
+
+          res.status(200).send(response);
+        }
+      );
+    });
+});
+
+// var testRecord = new Record({
+//   object_id: mongoose.Types.ObjectId("621b73efaf2839441cc92b98"),
+//   user_id: mongoose.Types.ObjectId("621b73efaf2839441cc92b86"),
+// });
+
+// testRecord.save();

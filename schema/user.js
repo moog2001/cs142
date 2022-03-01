@@ -6,6 +6,14 @@
 
 var mongoose = require("mongoose");
 
+var recordSchema = new mongoose.Schema({
+  object_id: mongoose.Schema.Types.ObjectId,
+  parent_object_id: mongoose.Schema.Types.ObjectId,
+  user_id: mongoose.Schema.Types.ObjectId,
+  type: String,
+  date_time: { type: Date, default: Date.now },
+});
+
 // create a schema
 var userSchema = new mongoose.Schema({
   login_name: String,
@@ -16,11 +24,13 @@ var userSchema = new mongoose.Schema({
   occupation: String, // Occupation of the user.
   password_digest: String,
   salt: String,
+  records: [{ type: mongoose.Schema.Types.ObjectId, ref: "Record" }],
 });
 
 // the schema is useless so far
 // we need to create a model using it
 var User = mongoose.model("User", userSchema);
+var Record = mongoose.model("Record", recordSchema);
 
 // make this available to our users in our Node applications
-module.exports = User;
+module.exports = { User, Record };
